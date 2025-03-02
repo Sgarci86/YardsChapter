@@ -1,0 +1,110 @@
+### Moran's Local - this one is the final code for Local
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(reshape2)
+#This section fixes the error files and the parameter file and finally binding them together to run graphs
+getwd()
+#Reading in Moran's Local file
+#the file came through with missing list files, not sure why. Each time it came through it was different. I had to use the View() function in order to see the list files in order
+MoranLocalexp1<-readRDS("exp1_moran_local.rds")
+View(MoranLocalexp1)
+
+#these were the ones that needed to be deleted
+MoranLocalexp1[c(32, 33, 36, 37, 40:44, 47, 48, 50, 273, 274, 283, 285, 291:293, 296, 299, 300)] <- NULL
+View(MoranLocalexp1)
+#you had to turn it into a dataframe first after cleaning it up. Then you can turn the dataframe into a tibble
+dfMoranLocalexp1 <- as.data.frame(MoranLocalexp1)
+tibMoranLocalexp1<-as.tibble(dfMoranLocalexp1)  
+
+
+#get the dist.class columns
+Morandistexp1 <- tibMoranLocalexp1 %>% dplyr::select(contains("dist.class")) %>% reshape2::melt(cols=c("1":"478"), id.vars=NULL) %>% select(cols = "value") %>% dplyr::rename(Moran.dist.class = cols)
+#get coefficient column
+Moranstatexp1 <- tibMoranLocalexp1 %>% dplyr::select(contains("coef")) %>% reshape2::melt(cols=c("1":"478"), id.vars=NULL) %>% 
+  select(cols = "value") %>% dplyr::rename(Moran.local = cols)
+#You have to make sure dplyr::select is on. Melt is from reshape2. 
+
+# do the same to get the pvalue column below
+MoranPvalueexp1 <- tibMoranLocalexp1 %>% dplyr::select(contains("p.value")) %>% melt(cols=c("1":"478"), id.vars=NULL) %>% select(cols = "value") %>% dplyr::rename(p.value = cols)
+
+#put the all columns together
+MoranLocalstatsexp1 <- cbind(Morandistexp1, Moranstatexp1, MoranPvalueexp1)
+View(MoranLocalstatsexp1)
+
+#needed to create a row ID first so I could extract the first 15 rows of each 
+Rownumber <-rep(c(1:68), times = 478) #this would total XXX rows
+Rownumber <- as.data.frame(Rownumber) #make it a data frame so you can bind
+
+#bind the columns all together again
+FinalColumns <- cbind(MoranLocalstatsexp1, Rownumber)
+
+#now only extract the first 15 rows from the Rownumber column 
+FinalColumnsexp1 <- dplyr::filter(FinalColumns, Rownumber %in% c("1": "15"))
+
+View(FinalColumnsexp1)
+#write.csv(FinalColumnsMoran, "FinalColumnsMoran.csv")
+
+#add these FinalColumnsMoran to the parameter file but first fix the parameter file to eliminate the files that came back homogeneous 
+ParameterTableMimic<-read.csv("table_exp1Nurseries1mimic.csv")
+Param<-ParameterTableMimic 
+Paramtib <- as.tibble(Param)
+View(Paramtib)
+
+#since Param is not a list, it comes in as a csv, you have to delete by -c
+Paramtibfixed <- Paramtib[-c(32, 33, 36, 37, 40:44, 47, 48, 50, 273, 274, 283, 285, 291:293, 296, 299, 300), ]
+View(Paramtibfixed)
+#the above did not put them in order, so you have to replace the run column 
+Run1 <- as.data.frame(c(1:478)) %>% select(cols = "c(1:478)") %>% dplyr::rename(Run = cols)
+
+Paramtibfixed$Run <- Run1$Run
+View(Paramtibfixed)
+#parameter file is fixed but now you have to repeat each row so that it can match up with the 15 distance classes that way you can graph it. In this case 7,230 rows
+
+```
+
+### Fixing the parameter file so it repeats 15 times
+
+```{r}
+#this made replicates of the rows for the 482 runs. So fifteen rows of Run 1, fifteen rows of Run 2 etc... 
+#Repeat rows 1 through 478, 15 times, for all columns , ] 
+dfexp1 <- Paramtibfixed
+ParametersMoran<-dfexp1[rep(seq_len(nrow(dfexp1)), each = 15), ]  
+View(ParametersMoran)
+
+#take out what you don't need from file (I don't see these so no need)
+ParametersMoranCleaned<- ParametersMoran %>% subset(select = -c(Step.Number, X, X.1, X.2))
+
+#now combine the Moran statistic column with the parameter file
+MoransLocalexp1finalfile <- cbind(FinalColumnsexp1, ParametersMoran)
+write.csv(MoransLocalexp1finalfile, "MoransLocalexp1finalfile.csv")
+View(MoransLocalexp1finalfile)
+```
+
+### Graphs for Moran Local with Parameters
+
+```{r}
+#| warning: false
+MoransLocalexp1finalfile$Yard.Diff = as.factor(MoransLocalexp1finalfile$Yard.Diff)
+#FinalFileMoranLocal$Moran.dist.class = as.numeric(FinalFileMoranLocal$Moran.dist.class)
+
+ggplot(MoransLocalexp1finalfile, aes(x = Moran.dist.class, y = Moran.local, color = Yard.Diff,  
+  shape= Yard.Diff)) +
+  geom_point(alpha = 0.2) + geom_smooth(se = FALSE) + 
+  geom_hline(yintercept = 0, linetype = 'longdash') +
+  facet_grid(vars(Neighbor.Distance), vars(Happy.Type), labeller = "label_both") +
+  labs(x = "Yard Distance", y = "Moran I", title = "Local Moran I Over 30 Yards") + theme_minimal() 
+
+## Visualization
+
+library(ggplot2)
+#ggplot needs for this column to be change to as.factor to graph it
+MoransLocalexp1finalfile$Yard.Diff = as.factor(MoransLocalexp1finalfile$Yard.Diff)
+
+ ggplot(MoransLocalexp1finalfile, aes(x = as.numeric(as.character(Moran.dist.class)), y = Moran.local, color = Yard.Diff,
+  shape= Yard.Diff)) + 
+  geom_point(alpha = 0.4) + geom_smooth(se = FALSE) + scale_x_continuous(limits = c(0,30), breaks = c(10,20,30)) +
+  geom_hline(yintercept = 0, linetype = 'longdash') + facet_grid(vars(Neighbor.Distance), vars(Happy.Type), labeller = "label_both") +
+  labs(x = "Yard Distance", y = "Moran I", title = "Local Moran I Over 30 Yards", subtitle = "No Contraints, Mimicry")  + theme_bw() 
+```
