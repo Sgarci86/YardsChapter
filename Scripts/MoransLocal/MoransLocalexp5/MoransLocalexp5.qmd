@@ -8,55 +8,55 @@ library(reshape2)
 getwd()
 #Reading in Moran's Local file
 #the file came through with missing list files, not sure why. Each time it came through it was different. I had to use the View() function in order to see the list files in order
-MoranLocalexp4<-readRDS("exp4_moran_local.rds")
-View(MoranLocalexp4)
+MoranLocalexp5<-readRDS("exp5_moran_local.rds")
+View(MoranLocalexp5)
 
 #these were the ones that needed to be deleted
-MoranLocalexp4[c(1,11)] <- NULL
-View(MoranLocalexp4)
+#MoranLocalexp6[c(1,11)] <- NULL
+View(MoranLocalexp5)
 #you had to turn it into a dataframe first after cleaning it up. Then you can turn the dataframe into a tibble
-dfMoranLocalexp4 <- as.data.frame(MoranLocalexp4)
-tibMoranLocalexp4<-as.tibble(dfMoranLocalexp4)  
+dfMoranLocalexp5 <- as.data.frame(MoranLocalexp5)
+tibMoranLocalexp5<-as.tibble(dfMoranLocalexp5)  
 
 
 #get the dist.class columns
-Morandistexp4 <- tibMoranLocalexp4 %>% dplyr::select(contains("dist.class")) %>% reshape2::melt(cols=c("1":"28"), id.vars=NULL) %>% select(cols = "value") %>% dplyr::rename(Moran.dist.class = cols)
+Morandistexp5 <- tibMoranLocalexp5 %>% dplyr::select(contains("dist.class")) %>% reshape2::melt(cols=c("1":"30"), id.vars=NULL) %>% select(cols = "value") %>% dplyr::rename(Moran.dist.class = cols)
 #get coefficient column
-Moranstatexp4 <- tibMoranLocalexp4 %>% dplyr::select(contains("coef")) %>% reshape2::melt(cols=c("1":"28"), id.vars=NULL) %>% 
+Moranstatexp5 <- tibMoranLocalexp5 %>% dplyr::select(contains("coef")) %>% reshape2::melt(cols=c("1":"30"), id.vars=NULL) %>% 
   select(cols = "value") %>% dplyr::rename(Moran.local = cols)
 #You have to make sure dplyr::select is on. Melt is from reshape2. 
 
 # do the same to get the pvalue column below
-MoranPvalueexp4 <- tibMoranLocalexp4 %>% dplyr::select(contains("p.value")) %>% melt(cols=c("1":"28"), id.vars=NULL) %>% select(cols = "value") %>% dplyr::rename(p.value = cols)
+MoranPvalueexp5 <- tibMoranLocalexp5 %>% dplyr::select(contains("p.value")) %>% melt(cols=c("1":"30"), id.vars=NULL) %>% select(cols = "value") %>% dplyr::rename(p.value = cols)
 
 #put the all columns together
-MoranLocalstatsexp4 <- cbind(Morandistexp4, Moranstatexp4, MoranPvalueexp4)
-View(MoranLocalstatsexp4)
+MoranLocalstatsexp5 <- cbind(Morandistexp5, Moranstatexp5, MoranPvalueexp5)
+View(MoranLocalstatsexp5)
 
 #needed to create a row ID first so I could extract the first 15 rows of each 
-Rownumber <-rep(c(1:68), times = 28) #this would total XXX rows
+Rownumber <-rep(c(1:68), times = 30) #this would total XXX rows
 Rownumber <- as.data.frame(Rownumber) #make it a data frame so you can bind
 
 #bind the columns all together again
-FinalColumns <- cbind(MoranLocalstatsexp4, Rownumber)
+FinalColumns <- cbind(MoranLocalstatsexp5, Rownumber)
 
 #now only extract the first 15 rows from the Rownumber column 
-FinalColumnsexp4 <- dplyr::filter(FinalColumns, Rownumber %in% c("1": "15"))
+FinalColumnsexp5 <- dplyr::filter(FinalColumns, Rownumber %in% c("1": "15"))
 
-View(FinalColumnsexp4)
+View(FinalColumnsexp5)
 #write.csv(FinalColumnsMoran, "FinalColumnsMoran.csv")
 
 #add these FinalColumnsMoran to the parameter file but first fix the parameter file to eliminate the files that came back homogeneous 
-ParameterTableMimic<-read.csv("table_exp4Nursery149Mimic.csv")
-Param<-ParameterTableMimic 
+ParameterTable<-read.csv("control_table.csv")
+Param<-ParameterTable
 Paramtib <- as.tibble(Param)
 View(Paramtib)
 
 #since Param is not a list, it comes in as a csv, you have to delete by -c
-Paramtib <- Paramtib[-c(1,11), ]
+#Paramtib <- Paramtib[-c(1,11), ]
 #View(Paramtibfixed)
 #the above did not put them in order, so you have to replace the run column 
-Run1 <- as.data.frame(c(1:28)) %>% select(cols = "c(1:28)") %>% dplyr::rename(Run = cols)
+Run1 <- as.data.frame(c(1:30)) %>% select(cols = "c(1:30)") %>% dplyr::rename(Run = cols)
 
 Paramtib$Run <- Run1$Run
 View(Paramtib)
@@ -69,17 +69,17 @@ View(Paramtib)
 ```{r}
 #this made replicates of the rows for the 482 runs. So fifteen rows of Run 1, fifteen rows of Run 2 etc... 
 #Repeat rows 1 through 478, 15 times, for all columns , ] 
-dfexp4 <- Paramtib
-ParametersMoran<-dfexp4[rep(seq_len(nrow(dfexp4)), each = 15), ]  
+dfexp5 <- Paramtib
+ParametersMoran<-dfexp5[rep(seq_len(nrow(dfexp5)), each = 15), ]  
 View(ParametersMoran)
 
 #take out what you don't need from file (I don't see these so no need)
 #ParametersMoranCleaned<- ParametersMoran %>% subset(select = -c(Step.Number, X, X.1, #X.2))
 
 #now combine the Moran statistic column with the parameter file
-MoransLocalexp4finalfile <- cbind(FinalColumnsexp4, ParametersMoran)
-write.csv(MoransLocalexp4finalfile, "MoransLocalexp4finalfile.csv")
-View(MoransLocalexp4finalfile)
+MoransLocalexp5finalfile <- cbind(FinalColumnsexp5, ParametersMoran)
+write.csv(MoransLocalexp5finalfile, "MoransLocalexp6finalfile.csv")
+View(MoransLocalexp5finalfile)
 ```
 
 ### Graphs for Moran Local with Parameters
@@ -87,21 +87,23 @@ View(MoransLocalexp4finalfile)
 ```{r}
 ## Visualization
 
+## Visualization
+
 library(ggplot2)
 #you have to graph it like a linear model if you have more than 2 variables. 
 #ggplot needs for this column to be change to as.factor to graph it
 
 #fixing before graphing
-MoransLocalexp4finalfile<-MoransLocalexp4finalfile %>% dplyr::rename(Nursery = Num.nursery)
-MoransLocalexp4finalfile$Nursery = as.factor(MoransLocalexp4finalfile$Nursery)
+MoransLocalexp5finalfile<-MoransLocalexp5finalfile %>% dplyr::rename(Nursery = Num.nursery)
+MoransLocalexp5finalfile$Nursery = as.factor(MoransLocalexp5finalfile$Nursery)
 #MantelLocalFinalexp4<-MantelLocalFinalexp4 %>% dplyr::rename(HT = Happy.type)
 
 
 #graph
- ggplot(MoransLocalexp4finalfile, aes(x = as.numeric(as.character(Moran.dist.class)), y = Moran.local, color = Nursery,
+ ggplot(MoransLocalexp5finalfile, aes(x = as.numeric(as.character(Moran.dist.class)), y = Moran.local, color = Nursery,
   shape= Nursery)) + 
   geom_point(alpha = 0.2) + geom_smooth(se = FALSE) + scale_x_continuous(limits = c(0,30), breaks = c(10,20,30)) +
-  geom_hline(yintercept = 0, linetype = 'longdash') + facet_grid(Neighbor.dist ~ Happy.type, labeller = "label_both") +
-  labs(x = "Yard Distance", y = "Moran I", title = "Local Moran I Over 30 Yards", subtitle = "Nurseries 1,4,9") + theme_bw()
+  geom_hline(yintercept = 0, linetype = 'longdash') + #+ facet_grid(Neighbor.dist ~ Happy.type, labeller = "label_both") +
+  labs(x = "Yard Distance", y = "Moran I", title = "Local Moran I Over 30 Yards", subtitle = "Control") + theme_bw()
  
 ```
