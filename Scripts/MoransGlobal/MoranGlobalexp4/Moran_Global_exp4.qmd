@@ -1,0 +1,64 @@
+```{r}
+## Moran I Global wrangling and graphs
+library(tidyverse)
+library(reshape2)
+library(dplyr)
+
+#Reading in Moran Global Results 
+Moran_globalexp4<-readRDS("exp4_moran_global.rds")
+#View(Moran_globalexp4)
+
+Moran_globaldf <- as.data.frame(Moran_globalexp4)
+
+#take out the Morans I value (observed)
+tibMoranglobal<-as_tibble(Moran_globaldf)
+
+Moranglobalcolumns <- tibMoranglobal %>% dplyr::select(contains("observed")) %>% reshape2::melt(cols=c("1":"30"), id.vars=NULL) %>% select(cols = "value") %>% dplyr::rename(Moran.global = cols)
+
+#take out pvalue in case it is needed
+Moranpvaluecolumns <- tibMoranglobal %>% dplyr::select(contains("p.value")) %>% reshape2::melt(cols=c("1":"30"), id.vars=NULL) %>% select(cols = "value") %>% dplyr::rename(P.value = cols)
+
+#cbind the two columns created above
+MoranColumnsNeeded <- cbind(Moranglobalcolumns,Moranpvaluecolumns)
+
+```
+
+```{r}
+#binding the parameters with the Moran global and pvalues. Fix the parameter file first by taking out bad files
+ParameterTableMimic<-read.csv("table_exp4Nursery149Mimic.csv")
+Param<-ParameterTableMimic 
+Paramtib <- as.tibble(Param)
+
+#the above did not put the rows in sequential order again so you have to fixed that. Make a new Run column 
+#you don't need this below since there were no error files 
+Run1 <- as.data.frame(c(1:30)) %>% select(cols = "c(1:30)") %>% dplyr::rename(Run = cols)
+Paramtib$Run <- Run1$Run
+#Paramtib
+#now you can bind them 
+global_param_updated<-cbind(MoranColumnsNeeded, Paramtib) 
+#View(global_param_updated)
+
+global_param_updated<-global_param_updated %>% dplyr::rename("Global.Morans.I" = Moran.global)
+global_param_updated<-global_param_updated %>% dplyr::rename("Nursery" = Num.nursery)
+
+ 
+write.csv(global_param_updated, "MoranGlobalFinalexp4.csv")
+```
+
+```{r}
+#now plot the final resulting file
+
+ggplot(global_param_updated, aes(x = as.factor(Nursery), y = Global.Morans.I, fill= Global.Morans.I)) + 
+  scale_y_continuous(limits=c(0,0.4), breaks=c(0,0.1,0.2,0.3,0.4)) + geom_point(pch=21) + scale_fill_gradient(limits=c(0,0.4), breaks=c(0,0.1,0.2,0.3,0.4), low = "cyan", high = "salmon") +
+    labs(x = "Nurseries", y = "Moran's I", title = "Global Moran's I \nNurseries 1,4,9") + theme(axis.title.x=element_text(size=15), axis.title.y=element_text(size=15), axis.text = element_text(size=14), legend.text = element_text(size = 14), legend.title = element_text(size = 15), axis.ticks = element_blank()) + theme_bw()
+
+
+
+ggplot(global_param_updated, aes(x = as.factor(Nursery), y = Neighbor.dist)) + scale_fill_steps(low = "cyan", high = "salmon", limits=c(0,0.4), breaks=c(0,0.1,0.2,0.3,0.4)) + geom_tile(aes(fill=Global.Morans.I)) +  geom_point(aes(size = P.value < 0.05)) + scale_y_continuous(limits = c(0,4), breaks = c(1,3)) +
+theme(panel.grid = element_blank(), panel.background =
+element_blank(), strip.background = element_blank(), strip.text = element_text(size = 12), strip.text.y.right = element_text(vjust= -1)) + labs(x = "Nursery", y = "Neighbor distance", title = "Global Moran's I", subtitle = "Nurseries 1,4,9") + theme(plot.title=element_text(hjust=0), axis.title.x=element_text(size=13, vjust= -1), axis.title.y=element_text(size=13), axis.text = element_text(size=12), axis.text.y = element_text(margin = margin(r = -4)), legend.text = element_text(size = 12), legend.title = element_text(size = 13, vjust = 1), axis.ticks = element_blank()) + scale_size_manual(values = c("FALSE" = 0, "TRUE" = 3), name = "p-value < 0.05") + theme(legend.box.spacing = unit(2, "cm"), legend.spacing = unit(1, "cm"))
+  
+
+    
+```
+

@@ -1,0 +1,61 @@
+```{r}
+## Dredge tests 
+
+citation("vegan") #this is to cite any package
+
+```
+
+```{r}
+library(MuMIn)
+#checking which variable has highest effect 
+#checking which is best model
+## preparing the linear model with all parameters and some interactions
+#Morans Local, FinalFileMoranLocal
+#Morans Global, global_param_updated
+#Mantel Local, MantelParamLocal
+#Mantel Global, global_param
+MantelGlobalFullModel = lm(Mantelglobal ~ Yard.Difference + 
+                    Neighbor.Distance +
+                    Comparison.Type +
+                    Comparison.Type:Neighbor.Distance +
+                    Yard.Difference:Neighbor.Distance +
+                    Yard.Difference:Comparison.Type, 
+                  data = global_param) 
+
+
+## Model selection procedure: 
+options(na.action = "na.fail")  
+
+dd = dredge(MantelGlobalFullModel)
+# View the top models
+head(dd)
+
+#this is for variable estimates 
+summary(MantelGlobalFullModel)
+
+## Best model summary: this takes out the worst variables to give you best model 
+summary(get.models(dd, 1)[[1]])
+```
+
+```{r}
+
+```
+MantelGlobalFullModel = lm(Mantelglobal ~ Yard.Difference + 
+                    Neighbor.Distance +
+                    Comparison.Type +
+                    Comparison.Type:Neighbor.Distance +
+                    Yard.Difference:Neighbor.Distance +
+                    Yard.Difference:Comparison.Type, 
+                  data = global_param) 
+
+
+## Model selection procedure: 
+options(na.action = "na.fail")  
+
+dd = dredge(MantelGlobalFullModel)
+# View the top models
+head(dd)
+
+#this is for variable estimates 
+summary(MantelGlobalFullModel)
+

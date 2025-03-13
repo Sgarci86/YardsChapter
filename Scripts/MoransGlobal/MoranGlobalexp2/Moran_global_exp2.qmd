@@ -1,0 +1,107 @@
+```{r}
+## Moran I Global wrangling and graphs
+library(tidyverse)
+library(reshape2)
+library(dplyr)
+
+#Reading in Moran Global Results 
+Moran_globalexp2<-readRDS("exp2_moran_global.rds")
+#View(Moran_globalexp2)
+Moran_globalexp2[c(302, 304:307, 335:338, 340)] <- NULL
+Moran_globaldf <- as.data.frame(Moran_globalexp2)
+
+#take out the Morans I value (observed)
+tibMoranglobal<-as_tibble(Moran_globaldf)
+
+Moranglobalcolumns <- tibMoranglobal %>% dplyr::select(contains("observed")) %>% reshape2::melt(cols=c("1":"470"), id.vars=NULL) %>% select(cols = "value") %>% dplyr::rename(Moran.global = cols)
+
+#take out pvalue in case it is needed
+Moranpvaluecolumns <- tibMoranglobal %>% dplyr::select(contains("p.value")) %>% reshape2::melt(cols=c("1":"470"), id.vars=NULL) %>% select(cols = "value") %>% dplyr::rename(P.value = cols)
+
+#cbind the two columns created above
+MoranColumnsNeeded <- cbind(Moranglobalcolumns,Moranpvaluecolumns)
+
+```
+
+```{r}
+#binding the parameters with the Moran global and pvalues. Fix the parameter file first by taking out bad files
+ParameterTableMimic<-read.csv("table_exp2Nurseries1_4mimic_constraints.csv")
+Param<-ParameterTableMimic 
+Paramtib <- as.tibble(Param)
+Paramtibfixed <- Paramtib[-c(302, 304:307, 335:338, 340), ]
+#the above did not put the rows in sequential order again so you have to fixed that. Make a new Run column 
+#you don't need this below since there were no error files 
+Run1 <- as.data.frame(c(1:470)) %>% select(cols = "c(1:470)") %>% dplyr::rename(Run = cols)
+Paramtibfixed$Run <- Run1$Run
+#Paramtibfixed
+#now you can bind them 
+global_param_updated<-cbind(MoranColumnsNeeded, Paramtibfixed) 
+#View(global_param_updated)
+
+global_param_updated<-global_param_updated %>% dplyr::rename("Global.Morans.I" = Moran.global)
+global_param_updated<-global_param_updated %>% dplyr::rename("Nursery" = Num.nursery)
+
+
+#this is so you can average the pvalue for every 10 replicates. Every ten replicates ran the same parameters 10 times and outputted a different pvalue for each. Then I took the average to come up with a fair pvalue. 
+
+#this file has errors so it had to be reduced to 491 replicates. Because of this, the code to fix the pvalues has to change because the lines are not an even 500. To solve this problem I just took out another replicate so we can have an even 490 divisible by 10. I spent about 6 hours trying to figure it out the other way. 
+
+
+n=10
+
+significance<-colMeans(matrix(global_param_updated$P.value, nrow=10))  #this is the calculation of rows
+significance<-as.data.frame(significance)
+significance<-significance[rep(seq_len(nrow(significance)), each = 10), ]  #these are the repeats 
+as.data.frame(significance)
+#View(significance)
+
+#combine all columns for final 
+global_param_updated<-cbind(global_param_updated,significance)
+ 
+write.csv(global_param_updated, "MoranGlobalFinalexp2.csv")
+```
+
+```{r}
+
+#subset the happy.type equal factor 
+attach(global_param_updated) #to begin the subset
+MGequaldata <- global_param_updated[which(Comparison.type == 'equal'),]
+detach(global_param_updated) #to go back to normal?
+
+#subset the happy.type equal-or-greater factor 
+attach(global_param_updated) #to begin the subset
+MGequalorgreaterdata <- global_param_updated[which(Comparison.type == 'equal-or-greater'),]
+detach(global_param_updated) #to go back to normal?
+
+library(ggpubr)
+library(gridExtra)
+library(cowplot)
+#now plot the final resulting file
+
+ggplot(MGequaldata, aes(x = as.factor(Neighbor.distance), y = Yard.diff)) + scale_fill_steps(low = "cyan", high = "salmon", limits=c(0,0.4), breaks=c(0,0.1,0.2,0.3,0.4)) + geom_tile(aes(fill=Global.Morans.I)) +  geom_point(aes(size = significance < 0.05)) + scale_y_continuous(limits = c(-1,3), breaks = c(0,2)) + 
+facet_grid(Constraint ~ Nursery, labeller = "label_both") + theme(panel.grid = element_blank(), panel.background =
+element_blank(), strip.background = element_blank(), strip.text = element_text(size = 13), strip.text.y.right = element_text(vjust= -1)) + labs(x = "Neighbor distance", y = "Yard difference", title = "Comparison-type = equal") + theme(plot.title=element_text(hjust= 0.5, vjust= 3), axis.title.x=element_text(size=13, vjust= -1), axis.title.y=element_text(size=13, vjust=3), axis.text = element_text(size=12, face = "bold"), axis.ticks = element_blank(), legend.title = element_text(size = 13), legend.text = element_text(size = 12)) + scale_size_manual(values = c("FALSE" = 0, "TRUE" = 3), name = "p-value < 0.05") + theme(legend.box.spacing = unit(2, "cm"), legend.spacing = unit(1, "cm"))
+
+
+ggplot(MGequalorgreaterdata, aes(x = as.factor(Neighbor.distance), y = Yard.diff)) + scale_fill_steps(low = "cyan", high = "salmon", limits=c(0,0.4), breaks=c(0,0.1,0.2,0.3,0.4)) + geom_tile(aes(fill=Global.Morans.I)) +  geom_point(aes(size = significance < 0.05)) + scale_y_continuous(limits = c(-1,3), breaks = c(0,2)) + 
+facet_grid(Constraint ~ Nursery, labeller = "label_both") + theme(panel.grid = element_blank(), panel.background =
+element_blank(), strip.background = element_blank(), strip.text = element_text(size = 13), strip.text.y.right = element_text(vjust= -1)) + labs(x = "Neighbor distance", y = "Yard difference", title = "Comparison-type = equal-or-greater") + theme(plot.title=element_text(hjust= 0.5, vjust= 3), axis.title.x=element_text(size=13, vjust= -1), axis.title.y=element_text(size=13, vjust=3), axis.text = element_text(size=12, face = "bold"), legend.text = element_text(size = 12), legend.title = element_text(size = 13, vjust=4), axis.ticks = element_blank()) + scale_size_manual(values = c("FALSE" = 0, "TRUE" = 3), name = "p-value < 0.05") + theme(legend.box.spacing = unit(2, "cm"), legend.spacing = unit(1, "cm"))
+
+#this below is to combine both plots in case we want to do that in the future
+#combined_plot <- plot_grid(
+#  g1 + theme(legend.position = "none"),  # Remove legend from the first plot
+#  g2 + theme(legend.position = "none"),  # Remove legend from the second plot
+#  align = "hv", ncol = 2,                # Align both plots horizontally
+#  rel_widths = c(1, 1)                   # Set relative widths of plots
+#)
+
+
+#legend <- get_legend(g2 + theme(legend.position = "bottom", legend.title = element_text(hjust = 0.5), #legend.key.height = unit(-0.15, "cm")))
+
+#final_plot <- plot_grid(combined_plot, legend, ncol = 1, rel_heights = c(1, 0.4))
+
+#, limits=c(0,0.4), breaks=c(0,0.1,0.2,0.3,0.4)) 
+```
+
+```
+

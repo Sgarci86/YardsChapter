@@ -1,0 +1,71 @@
+```{r}
+## Moran I Global wrangling and graphs
+library(tidyverse)
+library(reshape2)
+library(dplyr)
+
+#Reading in Moran Global Results 
+Moran_globalexp1<-readRDS("exp1_moran_global.rds")
+#View(Moran_globalexp1)
+# I took out 1 more #298 so that it will be an even number divisible by ten 
+Moran_globalexp1[c(273, 283, 285, 291:293, 296, 298, 299, 300)] <- NULL
+Moran_globaldf <- as.data.frame(Moran_globalexp1)
+
+#take out the Morans I value (observed)
+tibMoranglobal<-as_tibble(Moran_globaldf)
+
+Moranglobalcolumns <- tibMoranglobal %>% dplyr::select(contains("observed")) %>% reshape2::melt(cols=c("1":"490"), id.vars=NULL) %>% select(cols = "value") %>% dplyr::rename(Moran.global = cols)
+
+#take out pvalue in case it is needed
+Moranpvaluecolumns <- tibMoranglobal %>% dplyr::select(contains("p.value")) %>% reshape2::melt(cols=c("1":"490"), id.vars=NULL) %>% select(cols = "value") %>% dplyr::rename(P.value = cols)
+
+#cbind the two columns created above
+MoranColumnsNeededexp1 <- cbind(Moranglobalcolumns,Moranpvaluecolumns)
+
+```
+
+```{r}
+#binding the parameters with the Moran global and pvalues. Fix the parameter file first by taking out bad files
+ParameterTableMimic<-read.csv("table_exp1Nurseries1mimic.csv")
+Param<-ParameterTableMimic 
+Paramtib <- as.tibble(Param)
+Paramtibfixed <- Paramtib[-c(273, 283, 285, 291:293, 296, 298, 299, 300), ]
+#the above did not put the rows in sequential order again so you have to fixed that. Make a new Run column 
+#you don't need this below since there were no error files 
+Run1 <- as.data.frame(c(1:490)) %>% select(cols = "c(1:490)") %>% dplyr::rename(Run = cols)
+Paramtibfixed$Run <- Run1$Run
+#Paramtibfixed
+#now you can bind them 
+global_Moran_exp1<-cbind(MoranColumnsNeededexp1, Paramtibfixed) 
+#View(global_param_updated)
+#write.csv(global_param_updated, "MoranGlobalFinalexp1.csv")
+#global_Moran_param_updated<-global_param_updated %>% dplyr::rename("Global.Morans.I" = Moran.global)
+#check to see if this was already updated above "moran.global" the name 
+view(global_Moran_exp1)
+
+#this is so you can average the pvalue for every 10 replicates. Every ten replicates ran the same parameters 10 times and outputted a different pvalue for each. Then I took the average to come up with a fair pvalue. 
+
+#this file has errors so it had to be reduced to 491 replicates. Because of this, the code to fix the pvalues has to change because the lines are not an even 500. To solve this problem I just took out another replicate so we can have an even 490 divisible by 10. I spent about 6 hours trying to figure it out the other way. 
+
+
+n=10
+
+significance<-colMeans(matrix(global_param_updated$P.value, nrow=10))  #this is the calculation of rows
+significance<-as.data.frame(significance)
+significance<-significance[rep(seq_len(nrow(significance)), each = 10), ]  #these are the repeats 
+as.data.frame(significance)
+#View(significance)
+
+```
+
+```{r}
+
+#now plot the final resulting file
+ggplot(global_param_updated, aes(x = as.factor(Neighbor.Distance), y = Yard.Diff)) + scale_fill_steps(low = "cyan", high = "salmon", limits=c(0,0.4), breaks=c(0,0.1,0.2,0.3,0.4)) + geom_tile(aes(fill=Global.Morans.I)) + geom_point(aes(size = significance < 0.05)) + 
+  facet_wrap(vars(Comparison.type)) + theme(panel.grid = element_blank(), panel.background = element_blank()) + labs(x = "Neighbor Distance", y = "Yard Difference", title = "Global Moran's I", subtitle = "Mimicry \nP-value < 0.05") + theme(axis.title.x=element_text(size=13, vjust= -1), axis.title.y=element_text(size=13, vjust=3), axis.text = element_text(size=11), strip.text = element_text(size = 12), legend.text = element_text(size = 11), legend.title = element_text(size = 12, vjust=4), legend.spacing = unit(1,"cm")) + scale_size_manual(values = c("FALSE" = 0, "TRUE" = 3), name = "p-value < 0.05")
+
+
+```
+
+```
+
