@@ -1,0 +1,80 @@
+------------------------------------------------------------------------
+
+### Mantel global wrangling and visuals
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(reshape2)
+library(foreach)
+
+
+
+#Reading in Mantel Global Results 
+Mantel_globalexp1<-readRDS("exp1_global_mantel.rds")
+#View(Mantel_globalexp1)
+#Pulling out the Mantel statistic column
+Mantelstats<- foreach(i=seq_along(Mantel_globalexp1)) %do% {
+  Mantel_globalexp1[[i]]$statistic
+}
+
+#have to rename first then tibble so it is easier to work with 
+names(Mantelstats) <- c(1:500)
+tibMantel<-as_tibble(Mantelstats)
+Mantelstatonly<-tibMantel %>% 
+  select(cols = c(1:500)) %>% melt(cols=c("1":"500"), id.vars=NULL) %>% 
+  select(cols = "value") %>% dplyr::rename(Mantelglobal = cols)
+
+#pulling out the pvalue column in case it is needed then combining the mantel r column
+#MantelcolumnsNeeded has both the mantel r and p value columns 
+Mantelpvalue<- foreach(i=seq_along(Mantel_globalexp1)) %do% {
+  Mantel_globalexp1[[i]]$signif
+}
+names(Mantelpvalue) <- c(1:500)
+tibMantelpvalue<-as_tibble(Mantelpvalue)
+MantelcolumnsNeededexp1<-tibMantelpvalue %>% 
+  select(cols = c(1:500)) %>% melt(cols=c("1":"500"), id.vars=NULL) %>% 
+  select(cols = "value") %>% dplyr::rename(pvalue = cols) %>% cbind(Mantelstatonly)
+
+```
+
+```{r}
+#reading in the parameter table from the Behavior Space Run 1-500
+ParameterTableMimic<-read.csv("table_exp1Nurseries1mimic.csv")
+Param<-ParameterTableMimic 
+#binding the parameters with the mantel r and pvalue columns
+global_Mantel_exp1<-cbind(MantelcolumnsNeededexp1, Param)
+View(global_Mantel_exp1)
+
+```
+
+```{r}
+#as.factor on the categorical variable made the plot NOT have gaps. That makes sense
+#using geom_tile to produce the correlogram
+global_param <- global_Mantel_exp1 #renaming this 
+
+
+#this is so you can average the pvalue for every 10 replicates. Every ten replicates ran the same parameters 10 times and outputted a different pvalue for each. Then I took the average to come up with a fair pvalue. 
+
+n=10
+
+significance<-colMeans(matrix(global_param$pvalue, nrow=10))
+significance<-as.data.frame(significance)
+significance<-significance[rep(seq_len(nrow(significance)), each = 10), ]  
+as.data.frame(significance)
+#View(significance)
+
+#combine all columns for final 
+global_param<-cbind(global_param,significance)
+ 
+write.csv(global_param, "MantelGlobalFinalexp1.csv")
+
+#now plot the final resulting file
+ggplot(global_param, aes(x = as.factor(Neighbor.Distance), y = Yard.Diff)) + scale_fill_steps(low = "cyan", high = "salmon", limits=c(0,0.25), breaks=c(0,0.05,0.1,0.15,0.2,0.25)) + geom_tile(aes(fill=Global.Mantel.r)) + geom_point(aes(size = significance < 0.05)) + 
+  facet_wrap(vars(Comparison.type)) + theme(panel.grid = element_blank(), panel.background = element_blank()) + labs(x = "Neighbor Distance", y = "Yard Difference", title = "Global Mantel R", subtitle = "Mimicry \nP-value < 0.05") + theme(axis.title.x=element_text(size=13, vjust= -1), axis.title.y=element_text(size=13, vjust=3), axis.text = element_text(size=11), strip.text = element_text(size = 12), legend.text = element_text(size = 11), legend.title = element_text(size = 12, vjust=4)) + scale_size_manual(values = c("FALSE" = 0, "TRUE" = 3), name = "p-value < 0.05")
+
+
+```
+
+
+

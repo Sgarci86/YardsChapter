@@ -1,0 +1,106 @@
+------------------------------------------------------------------------
+
+### Mantel global wrangling and visuals
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(reshape2)
+library(foreach)
+
+
+#Reading in Mantel Global Results 
+Mantel_globalexp2<-readRDS("exp2_global_mantel.rds")
+#View(Mantel_globalexp2)
+#Pulling out the Mantel statistic column
+Mantelstats<- foreach(i=seq_along(Mantel_globalexp2)) %do% {
+  Mantel_globalexp2[[i]]$statistic
+}
+
+#have to rename first then tibble so it is easier to work with 
+names(Mantelstats) <- c(1:480)
+tibMantel<-as_tibble(Mantelstats)
+Mantelstatonly<-tibMantel %>% 
+  select(cols = c(1:480)) %>% melt(cols=c("1":"480"), id.vars=NULL) %>% 
+  select(cols = "value") %>% dplyr::rename(Mantelglobal = cols)
+
+#pulling out the pvalue column in case it is needed then combining the mantel r column
+#MantelcolumnsNeeded has both the mantel r and p value columns 
+Mantelpvalue<- foreach(i=seq_along(Mantel_globalexp2)) %do% {
+  Mantel_globalexp2[[i]]$signif
+}
+names(Mantelpvalue) <- c(1:480)
+tibMantelpvalue<-as_tibble(Mantelpvalue)
+MantelcolumnsNeeded<-tibMantelpvalue %>% 
+  select(cols = c(1:480)) %>% melt(cols=c("1":"480"), id.vars=NULL) %>% 
+  select(cols = "value") %>% dplyr::rename(pvalue = cols) %>% cbind(Mantelstatonly)
+
+```
+
+```{r}
+#reading in the parameter table from the Behavior Space Run 1-480
+ParameterTableMimic<-read.csv("table_exp2Nurseries1_4mimic_constraints.csv")
+Param<-ParameterTableMimic 
+#binding the parameters with the mantel r and pvalue columns
+global_param<-cbind(MantelcolumnsNeeded, Param)
+#View(global_param)
+
+```
+
+```{r}
+#as.factor on the categorical variable made the plot NOT have gaps. That makes sense
+#using geom_tile to produce the correlogram
+
+#just renaming this column 
+global_param<-global_param %>% dplyr::rename("Global.Mantel.r" = Mantelglobal)
+global_param<-global_param %>% dplyr::rename("Nursery" = Num.nursery)
+
+
+#this is so you can average the pvalue for every 10 replicates. Every ten replicates ran the same parameters 10 times and outputted a different pvalue for each. Then I took the average to come up with a fair pvalue. 
+
+n=10
+
+significance<-colMeans(matrix(global_param$pvalue, nrow=10))
+significance<-as.data.frame(significance)
+significance<-significance[rep(seq_len(nrow(significance)), each = 10), ]  
+as.data.frame(significance)
+#View(significance)
+
+#combine all columns for final 
+global_param<-cbind(global_param,significance)
+ 
+write.csv(global_param, "MantelGlobalFinalexp2.csv")
+
+
+#subset the happy.type equal factor 
+attach(global_param) #to begin the subset
+MGequaldata <- global_param[which(Comparison.type == 'equal'),]
+detach(global_param) #to go back to normal?
+
+#subset the happy.type equal-or-greater factor 
+attach(global_param) #to begin the subset
+MGequalorgreaterdata <- global_param[which(Comparison.type == 'equal-or-greater'),]
+detach(global_param) #to go back to normal?
+
+
+#now plot the final resulting file
+ggplot(MGequaldata, aes(x = as.factor(Neighbor.distance), y = Yard.diff)) + scale_fill_steps(low = "cyan", high = "salmon", limits=c(0,0.25), breaks=c(0,0.05,0.1,0.15,0.2,0.25)) + geom_tile(aes(fill=Global.Mantel.r)) +  geom_point(aes(size = significance < 0.05)) + scale_y_continuous(limits = c(-1,3), breaks = c(0,2)) + 
+facet_grid(Constraint ~ Nursery, labeller = "label_both") + theme(panel.grid = element_blank(), panel.background =
+element_blank(), strip.background = element_blank(), strip.text = element_text(size = 12), strip.text.y.right = element_text(vjust= -1)) + labs(x = "Neighbor distance", y = "Yard difference", title = "Comparison-type = equal") + theme(plot.title=element_text(hjust= 0.5, vjust= 3), axis.title.x=element_text(size=13, vjust= -1), axis.title.y=element_text(size=13, vjust=3), axis.text = element_text(size=11), legend.text = element_text(size = 11), legend.title = element_text(size = 12, vjust=4), axis.ticks = element_blank()) + scale_size_manual(values = c("FALSE" = 0, "TRUE" = 3), name = "p-value < 0.05") + theme(legend.box.spacing = unit(2, "cm")) 
+
+#values = c(0,quantile(df$fill_var, fill_values_quantiles),
+                 #            ceiling(max(df$fill_var)))
+
+#potential codes below that can be worked on to make graphs better 
+#guides(size = guide_legend(override.aes = list(size = c(2))))
+#gghighlight(pvalue == "TRUE")
+#gghighlight(pvalue < 0.05)
+#p1 <- global_param %>% 
+#  mutate(sig = pvalue < 0.05) 
+
+palette <- colorRampPalette(RColorBrewer::brewer.pal(9,name = 'Set1'))(length(unique(tidied_pca$Tag)))
+
+```
+
+
+

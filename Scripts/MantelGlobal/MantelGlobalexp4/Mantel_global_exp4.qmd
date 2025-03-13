@@ -1,0 +1,72 @@
+------------------------------------------------------------------------
+
+### Mantel global wrangling and visuals
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(reshape2)
+library(foreach)
+
+
+#Reading in Mantel Global Results 
+Mantel_globalexp4<-readRDS("exp4_global_mantel.rds")
+View(Mantel_globalexp4)
+#Pulling out the Mantel statistic column
+Mantelstats<- foreach(i=seq_along(Mantel_globalexp4)) %do% {
+  Mantel_globalexp4[[i]]$statistic
+}
+
+#have to rename first then tibble so it is easier to work with 
+names(Mantelstats) <- c(1:30)
+tibMantel<-as_tibble(Mantelstats)
+Mantelstatonly<-tibMantel %>% 
+  select(cols = c(1:30)) %>% melt(cols=c("1":"30"), id.vars=NULL) %>% 
+  select(cols = "value") %>% dplyr::rename(Mantelglobal = cols)
+
+#pulling out the pvalue column in case it is needed then combining the mantel r column
+#MantelcolumnsNeeded has both the mantel r and p value columns 
+Mantelpvalue<- foreach(i=seq_along(Mantel_globalexp4)) %do% {
+  Mantel_globalexp4[[i]]$signif
+}
+names(Mantelpvalue) <- c(1:30)
+tibMantelpvalue<-as_tibble(Mantelpvalue)
+MantelcolumnsNeeded<-tibMantelpvalue %>% 
+  select(cols = c(1:30)) %>% melt(cols=c("1":"30"), id.vars=NULL) %>% 
+  select(cols = "value") %>% dplyr::rename(pvalue = cols) %>% cbind(Mantelstatonly)
+
+```
+
+```{r}
+#reading in the parameter table from the Behavior Space Run 1-480
+ParameterTableMimic<-read.csv("table_exp4Nursery149MimicMantel.csv")
+Param<-ParameterTableMimic 
+#binding the parameters with the mantel r and pvalue columns
+global_param<-cbind(MantelcolumnsNeeded, Param)
+View(global_param)
+
+```
+
+```{r}
+#as.factor on the categorical variable made the plot NOT have gaps. That makes sense
+#using geom_tile to produce the correlogram
+
+#just renaming this column 
+global_param<-global_param %>% dplyr::rename("Global.Mantel.r" = Mantelglobal)
+global_param<-global_param %>% dplyr::rename("Nursery" = Num.nursery)
+
+ 
+write.csv(global_param, "MantelGlobalFinalexp4.csv")
+
+ggplot(global_param, aes(x = as.factor(Nursery), y = Global.Mantel.r, fill= Global.Mantel.r)) + 
+  scale_y_continuous(limits=c(0,0.25), breaks=c(0,0.05,0.1,0.15,0.2,0.25)) + geom_point(pch=21) + scale_fill_gradient(limits=c(0,0.25), breaks=c(0,0.05,0.1,0.15,0.2,0.25), low = "cyan", high = "salmon") +
+    labs(x = "Nurseries", y = "Mantel r", title = "Global Mantel r \nNurseries 1,4,9") + theme(axis.title.x=element_text(size=13), axis.title.y=element_text(size=13), axis.text = element_text(size=12), legend.text = element_text(size = 12), legend.title = element_text(size = 13), axis.ticks = element_blank()) + theme_bw()
+    
+
+ggplot(global_param, aes(x = as.factor(Nursery), y = Neighbor.dist)) + scale_fill_steps(low = "cyan", high = "salmon", limits=c(0,0.4), breaks=c(0,0.05,0.10,0.15,0.20,0.25)) + geom_tile(aes(fill=Global.Mantel.r)) +  geom_point(aes(size = pvalue < 0.05)) + scale_y_continuous(limits = c(0,4), breaks = c(1,3)) +
+theme(panel.grid = element_blank(), panel.background =
+element_blank(), strip.background = element_blank(), strip.text = element_text(size = 12), strip.text.y.right = element_text(vjust= -1)) + labs(x = "Nursery", y = "Neighbor distance", title = "Global Mantel r", subtitle = "Nurseries 1,4,9") + theme(plot.title=element_text(hjust=0), axis.title.x=element_text(size=13, vjust= -1), axis.title.y=element_text(size=13), axis.text = element_text(size=12), axis.text.y = element_text(margin = margin(r = -4)), legend.text = element_text(size = 12), legend.title = element_text(size = 13, vjust=4), axis.ticks = element_blank()) + scale_size_manual(values = c("FALSE" = 0, "TRUE" = 3), name = "p-value < 0.05") + theme(legend.box.spacing = unit(2, "cm"), legend.spacing = unit(1, "cm"))
+```
+
+
+
