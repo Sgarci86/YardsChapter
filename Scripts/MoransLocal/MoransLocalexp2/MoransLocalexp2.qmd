@@ -9,11 +9,11 @@ getwd()
 #Reading in Moran's Local file
 #the file came through with missing list files, not sure why. Each time it came through it was different. I had to use the View() function in order to see the list files in order
 MoranLocalexp2<-readRDS("exp2_moran_local.rds")
-View(MoranLocalexp2)
+#View(MoranLocalexp2)
 
-#these were the ones that needed to be deleted
+#these runs need to be deleted because they don't have output
 MoranLocalexp2[c(63,64,69,92,94,96,250,256,280,302:307,335:338,340)] <- NULL
-View(MoranLocalexp2)
+#View(MoranLocalexp2)
 #you had to turn it into a dataframe first after cleaning it up. Then you can turn the dataframe into a tibble
 dfMoranLocalexp2 <- as.data.frame(MoranLocalexp2)
 tibMoranLocalexp2<-as.tibble(dfMoranLocalexp2)  
@@ -31,7 +31,7 @@ MoranPvalueexp2 <- tibMoranLocalexp2 %>% dplyr::select(contains("p.value")) %>% 
 
 #put the all columns together
 MoranLocalstatsexp2 <- cbind(Morandistexp2, Moranstatexp2, MoranPvalueexp2)
-View(MoranLocalstatsexp2)
+#View(MoranLocalstatsexp2)
 
 #needed to create a row ID first so I could extract the first 15 rows of each 
 Rownumber <-rep(c(1:68), times = 460) #this would total XXX rows
@@ -43,23 +43,21 @@ FinalColumns <- cbind(MoranLocalstatsexp2, Rownumber)
 #now only extract the first 15 rows from the Rownumber column 
 FinalColumnsexp2 <- dplyr::filter(FinalColumns, Rownumber %in% c("1": "15"))
 
-View(FinalColumnsexp2)
-#write.csv(FinalColumnsMoran, "FinalColumnsMoran.csv")
 
-#add these FinalColumnsMoran to the parameter file but first fix the parameter file to eliminate the files that came back homogeneous 
+#fix the parameter file to eliminate the files that came back homogeneous 
 ParameterTableMimic<-read.csv("table_exp2Nurseries1_4mimic_constraints.csv")
 Param<-ParameterTableMimic 
 Paramtib <- as.tibble(Param)
-View(Paramtib)
+#View(Paramtib)
 
 #since Param is not a list, it comes in as a csv, you have to delete by -c
 Paramtibfixed <- Paramtib[-c(63,64,69,92,94,96,250,256,280,302:307,335:338,340), ]
-View(Paramtibfixed)
+#View(Paramtibfixed)
 #the above did not put them in order, so you have to replace the run column 
 Run1 <- as.data.frame(c(1:460)) %>% select(cols = "c(1:460)") %>% dplyr::rename(Run = cols)
 
 Paramtibfixed$Run <- Run1$Run
-View(Paramtibfixed)
+#View(Paramtibfixed)
 #parameter file is fixed but now you have to repeat each row so that it can match up with the 15 distance classes that way you can graph it. In this case 7,230 rows
 
 ```
@@ -71,7 +69,7 @@ View(Paramtibfixed)
 #Repeat rows 1 through 478, 15 times, for all columns , ] 
 dfexp2 <- Paramtibfixed
 ParametersMoran<-dfexp2[rep(seq_len(nrow(dfexp2)), each = 15), ]  
-View(ParametersMoran)
+#View(ParametersMoran)
 
 #take out what you don't need from file (I don't see these so no need)
 #ParametersMoranCleaned<- ParametersMoran %>% subset(select = -c(Step.Number, X, X.1, #X.2))
@@ -79,7 +77,7 @@ View(ParametersMoran)
 #now combine the Moran statistic column with the parameter file
 MoransLocalexp2finalfile <- cbind(FinalColumnsexp2, ParametersMoran)
 write.csv(MoransLocalexp2finalfile, "MoransLocalexp2finalfile.csv")
-View(MoransLocalexp2finalfile)
+#View(MoransLocalexp2finalfile)
 ```
 
 ### Graphs for Moran Local with Parameters
@@ -91,35 +89,126 @@ View(MoransLocalexp2finalfile)
 library(ggplot2)
 #ggplot needs for this column to be change to as.factor to graph it
 
-MoransLocalexp2finalfile<-MoransLocalexp2finalfile %>% dplyr::rename(HT = Happy.type)
 MoransLocalexp2finalfile<-MoransLocalexp2finalfile %>% dplyr::rename(Nursery = Num.nursery)
 MoransLocalexp2finalfile$Nursery = as.factor(MoransLocalexp2finalfile$Nursery)
 MoransLocalexp2finalfile$Yard.diff = as.factor(MoransLocalexp2finalfile$Yard.diff)
 
-View(MLequaldata)
-View(MLequalorgreaterdata)
-View(MoransLocalexp2finalfile)
-
  
-#subset the happy.type equal factor 
+#subset the Comparison.type equal factor 
 attach(MoransLocalexp2finalfile) #to begin the subset
-MLequaldata <- MoransLocalexp2finalfile[which(HT == 'equal'),]
+MLequaldata <- MoransLocalexp2finalfile[which(Comparison.type == 'equal'),]
 #detach(MoransLocalexp2finalfile) #to go back to normal if needed
 
  ggplot(MLequaldata, aes(x = as.numeric(as.character(Moran.dist.class)), y = Moran.local, color = Nursery, linetype = Yard.diff)) +  
   geom_point(alpha = 0.2) + geom_smooth(se = FALSE) + scale_x_continuous(limits = c(0,30), breaks = c(10,20,30)) +
   geom_hline(yintercept = 0, linetype = 'longdash') + facet_grid(Neighbor.distance ~ Constraint, labeller = "label_both") +
-  labs(x = "Yard Distance", y = "Moran I", title = "Local Moran I Over 30 Yards", subtitle = "Happy Type = equal") + theme_bw()
+  labs(x = "Yard Distance", y = "Moran's I", title = "Local Moran's I Over 30 Yards", subtitle = "Comparison type = equal") + theme_bw()
  
  
-#subset the happy.type equal-or-greater factor 
+#subset the Comparison.type equal-or-greater factor 
 attach(MoransLocalexp2finalfile) #to begin the subset
-MLequalorgreaterdata <- MoransLocalexp2finalfile[which(HT == 'equal-or-greater'),]
+MLequalorgreaterdata <- MoransLocalexp2finalfile[which(Comparison.type == 'equal-or-greater'),]
 #detach(MoransLocalexp2finalfile) #to go back to normal if needed 
   
  ggplot(MLequalorgreaterdata, aes(x = as.numeric(as.character(Moran.dist.class)), y = Moran.local, color = Nursery, linetype = Yard.diff)) +  
   geom_point(alpha = 0.2) + geom_smooth(se = FALSE) + scale_x_continuous(limits = c(0,30), breaks = c(10,20,30)) +
   geom_hline(yintercept = 0, linetype = 'longdash') + facet_grid(Neighbor.distance ~ Constraint, labeller = "label_both") +
-  labs(x = "Yard Distance", y = "Moran I", title = "Local Moran I Over 30 Yards", subtitle = "Happy Type = equal-or-greater") + theme_bw()
+  labs(x = "Yard Distance", y = "Moran's I", title = "Local Moran's I Over 30 Yards", subtitle = "Comparison type = equal-or-greater") + theme_bw()
  
 ```
+
+```{r}
+#This code below is to create two linear models for experiment 2. These models will be tested to see if they are significantly different. 
+
+exp2file <-read.csv("MoransLocalexp2finalfile.csv")
+view(exp2file)
+
+#take the constraints off and comparison type out of file as well as neighbor 9
+attach(exp2file) 
+Exp2equalgrterdata <- exp2file[which(Comparison.type == 'equal-or-greater'),]
+view(Exp2equalgrterdata4)
+
+attach(Exp2equalgrterdata)
+Exp2equalgrterdata2 <- Exp2equalgrterdata[which(Constraint == 'off'),]
+
+
+attach(Exp2equalgrterdata2)
+Exp2equalgrterdata3 <- Exp2equalgrterdata2[which(Yard.diff == '0'),]
+
+#final file for the two models after all subsets above, which can be done better
+attach(Exp2equalgrterdata3)
+Exp2equalgrterdata4 <- Exp2equalgrterdata3[which(Neighbor.distance == '9'),]
+
+#subsetting for both nurseries
+attach(Exp2equalgrterdata4)
+nur1file <- Exp2equalgrterdata4[which(Num.nursery == '1'),]
+
+attach(Exp2equalgrterdata4)
+nur4file <- Exp2equalgrterdata4[which(Num.nursery == '4'),]
+
+view(Exp2equalgrterdata4)
+
+#Creating the two separate linear models for an anova test of significance
+Nur1 <- lm(Moran.local ~ Yard.diff + Num.nursery + Comparison.type + Neighbor.distance + Constraint,
+          data = nur1file)
+Nur4 = lm(Moran.local ~ Yard.diff + Num.nursery + Comparison.type + Neighbor.distance + Constraint,
+          data = nur4file)
+
+###################################################################################################
+
+anova(lm(Moran.local ~ as.factor(predictor), data = your_data))
+
+
+#The t-test checks whether the mean response for the two predictor values is significantly different.
+#this is the welch's two sample t test. 
+t.test(Moran.local ~ Num.nursery + Moran.dist.class, data = Exp2equalgrterdata4) #run lm because of more than one variable, add yard.dist
+view(Exp2equalgrterdata4)
+
+
+
+nurserytest<- lm(Moranlog ~ Num.nursery + Moran.dist.class + Num.nursery:Moran.dist.class, 
+                 data = Exp2equalgrterdata4) #added the moran.dist 
+#but slope is not different, intercept is different. 
+#if the slopes were different you would have a significant interaction. 
+
+#the points may be a little off in this case because data is not normal. But the lm and the t test don't care, it needs to be normal. welches test is supposed to be robust to the violation, without getting into non-parametric. 
+
+summary(nurserytest)
+#this is in case you have to convert your predictor to a factor.
+your_data$predictor <- as.factor(your_data$predictor)
+
+hist(Moransq)
+
+
+
+
+#If the p-value is below 0.05, the two values significantly differ in their effect on the response.
+#you can also do an anova, it is an alternative to a t-test
+anova(lm(Moran.local ~ as.factor(Num.nursery), data = Exp2equalgrterdata4))
+
+boxplot(Moranlog ~ Exp2equalgrterdata4$Num.nursery)
+
+Moranlog <- log1p(Exp2equalgrterdata4$Moran.local)
+Moransq <- sqrt(Exp2equalgrterdata4$Moran.local+1)
+
+range(Exp2equalgrterdata4$Moran.local)
+
+
+MantelGlobalFullModel = lm(Mantelglobal ~ Yard.Difference + 
+                    Neighbor.Distance +
+                    Comparison.Type +
+                    Comparison.Type:Neighbor.Distance +
+                    Yard.Difference:Neighbor.Distance +
+                    Yard.Difference:Comparison.Type, 
+                  data = global_Mantel_exp1) 
+
+#do histogram for both groups to check for normality for moran local for each nursery. 
+hist()
+
+
+#first check the model with the different values included
+#then do an aic and see if it takes the specific model whether it is nursery 1 or 4.
+#do welches test
+
+```
+

@@ -71,30 +71,18 @@ View(Paramtibfixed)
 #Repeat rows 1 through 478, 15 times, for all columns , ] 
 dfexp1 <- Paramtibfixed
 ParametersMoran<-dfexp1[rep(seq_len(nrow(dfexp1)), each = 15), ]  
-View(ParametersMoran)
-
-#take out what you don't need from file (I don't see these so no need)
-ParametersMoranCleaned<- ParametersMoran %>% subset(select = -c(Step.Number, X, X.1, X.2))
+#View(ParametersMoran)
 
 #now combine the Moran statistic column with the parameter file
 MoransLocalexp1finalfile <- cbind(FinalColumnsexp1, ParametersMoran)
 write.csv(MoransLocalexp1finalfile, "MoransLocalexp1finalfile.csv")
-View(MoransLocalexp1finalfile)
+#View(MoransLocalexp1finalfile)
 ```
 
 ### Graphs for Moran Local with Parameters
 
 ```{r}
 #| warning: false
-MoransLocalexp1finalfile$Yard.Diff = as.factor(MoransLocalexp1finalfile$Yard.Diff)
-#FinalFileMoranLocal$Moran.dist.class = as.numeric(FinalFileMoranLocal$Moran.dist.class)
-
-ggplot(MoransLocalexp1finalfile, aes(x = Moran.dist.class, y = Moran.local, color = Yard.Diff,  
-  shape= Yard.Diff)) +
-  geom_point(alpha = 0.2) + geom_smooth(se = FALSE) + 
-  geom_hline(yintercept = 0, linetype = 'longdash') +
-  facet_grid(vars(Neighbor.Distance), vars(Happy.Type), labeller = "label_both") +
-  labs(x = "Yard Distance", y = "Moran I", title = "Local Moran I Over 30 Yards") + theme_minimal() 
 
 ## Visualization
 
@@ -105,6 +93,6 @@ MoransLocalexp1finalfile$Yard.Diff = as.factor(MoransLocalexp1finalfile$Yard.Dif
  ggplot(MoransLocalexp1finalfile, aes(x = as.numeric(as.character(Moran.dist.class)), y = Moran.local, color = Yard.Diff,
   shape= Yard.Diff)) + 
   geom_point(alpha = 0.4) + geom_smooth(se = FALSE) + scale_x_continuous(limits = c(0,30), breaks = c(10,20,30)) +
-  geom_hline(yintercept = 0, linetype = 'longdash') + facet_grid(vars(Neighbor.Distance), vars(Happy.Type), labeller = "label_both") +
-  labs(x = "Yard Distance", y = "Moran I", title = "Local Moran I Over 30 Yards", subtitle = "No Contraints, Mimicry")  + theme_bw() 
+  geom_hline(yintercept = 0, linetype = 'longdash') + facet_grid(vars(Neighbor.Distance), vars(Comparison.type), labeller = "label_both") +
+  labs(x = "Yard Distance", y = "Moran's I", title = "Local Moran's I Over 30 Yards", subtitle = "Mimicry")  + theme_bw() 
 ```
