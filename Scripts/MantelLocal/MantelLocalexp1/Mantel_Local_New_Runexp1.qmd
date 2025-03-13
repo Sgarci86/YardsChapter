@@ -1,0 +1,109 @@
+
+## Fixing the files for Mantel Local 
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(reshape2)
+library(foreach)
+getwd()
+#Reading in Mantel Correlogram Results from Behavior Space Run
+
+Mantel_localexp1<-readRDS("exp1_mantel_local.rds")
+head(Mantel_localexp1)
+View(Mantel_localexp1)
+
+Mantel_localexp1[c(321)] <- NULL
+#you had to turn it into a dataframe first after cleaning it up. Then you can turn the dataframe into a tibble
+
+
+#this will clean up the data
+Mantelstatsexp1<- foreach(i=seq_along(Mantel_localexp1)) %do% {   
+  Mantel_localexp1[[i]]$mantel.res
+}
+
+names(Mantel_localexp1) <- c(1:499)
+
+
+#it had to be renamed again
+#names(Mantelstatsexp1) <- c(1:30)  
+
+###you have to make it into a df first then take out the mantel r column
+dfMantellocal<-as.data.frame(Mantelstatsexp1)
+head(dfMantellocal)
+Mantelstatsexp1<-dfMantellocal %>% 
+  select(cols = contains("Mantel.cor")) %>% melt(cols=c("1":"499"), id.vars=NULL) %>% 
+  select(cols = "value") %>% dplyr::rename(Mantel.local = cols)
+
+#pulling out the pvalue in case it is needed 
+Pvalueexp1<-dfMantellocal %>%
+   select(cols = contains("Pr.corrected.")) %>% melt(cols=c("1":"499"), id.vars=NULL) %>%
+  select(cols = "value") %>% dplyr::rename(P.value = cols) 
+
+#pulling out class index column 
+Distanceexp1<-dfMantellocal %>%
+   select(cols = contains("class.index")) %>% reshape2::melt(cols=c("1":"499"), id.vars=NULL) %>%
+  select(cols = "value") %>% dplyr::rename(Class.Index = cols) 
+
+#combining all 3 columns 
+MantelLocalCorrexp1<-cbind(Mantelstatsexp1, Distanceexp1, Pvalueexp1)
+
+```
+
+
+```{r}
+#reading in the parameter table from the Behavior Space Run
+ParameterTableMimicexp1<-read.csv("table_exp1Nurseries1mimic.csv")
+#just making the name smaller. 
+dfMantelLocalexp1<-ParameterTableMimicexp1 
+#View(ParameterTableMimicexp1)
+
+#since Param is not a list, it comes in as a csv, you have to delete by -c
+ParamtibfixedMLocexp1 <- dfMantelLocalexp1[-c(321), ]
+#View(ParamtibfixedMLocexp1)
+#the above did not put them in order, so you have to replace the run column 
+run <- as.data.frame(c(1:499)) %>% select(cols = "c(1:499)") %>% dplyr::rename(run = cols)
+#View(ParamtibfixedMLocexp1)
+ParamtibfixedMLocexp1$run <- run$run
+
+
+
+#ParamtibfixedMLocexp1
+
+```
+
+```{r}
+#this made replicates of the rows for the runs. So fifteen rows of Run 1, fifteen rows of Run 2 etc... 
+#I did this so I can join the fiften new rows of the CorrColumnsNeeded file to the ParameterTableMimic file. Repeat rows 1 through XXX number of runs, 15 times, for all columns , ] 
+
+Parametersexp1fixed<-ParamtibfixedMLocexp1[rep(seq_len(nrow(ParamtibfixedMLocexp1)), each = 15), ]   
+#Parametersexp1fixed
+#View(Parametersexp1fixed)
+```
+
+```{r}
+#combine all columns for final 
+MantelLocalFinalexp1<- cbind(MantelLocalCorrexp1, Parametersexp1fixed)  
+write.csv(MantelLocalFinalexp1, "MantelLocalFinalexp1.csv")
+View(MantelLocalFinalexp1)
+
+```
+
+```{r}
+## Visualization
+
+library(ggplot2)
+#ggplot needs for this column to be change to as.factor to graph it
+MantelLocalFinalexp1$Yard.diff = as.factor(MantelLocalFinalexp1$Yard.diff)
+
+ ggplot(MantelLocalFinalexp1, aes(x = as.numeric(as.character(Class.Index)), y = Mantel.local, color = Yard.diff,
+  shape= Yard.diff)) + 
+  geom_point(alpha = 0.4) + geom_smooth(se = FALSE) + scale_x_continuous(limits = c(0,30), breaks = c(10,20,30)) +
+  geom_hline(yintercept = 0, linetype = 'longdash') + facet_grid(vars(Neighbor.distance), vars(Comparison.type), labeller = "label_both") +
+  labs(x = "Yard Distance", y = "Mantel R", title = "Local Mantel R Over 30 Yards", subtitle ="Mimicry")  + theme_bw() 
+
+ 
+
+```
+
+

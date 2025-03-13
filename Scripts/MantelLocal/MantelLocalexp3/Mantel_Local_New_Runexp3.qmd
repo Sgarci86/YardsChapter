@@ -1,0 +1,124 @@
+
+## Fixing the files for Mantel Local 
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(reshape2)
+library(foreach)
+getwd()
+#Reading in Mantel Correlogram Results from Behavior Space Run
+
+Mantel_localexp3<-readRDS("exp3_mantel_local.rds")
+head(Mantel_localexp3)
+View(Mantel_localexp3)
+
+#Mantel_localexp3[c(418)] <- NULL  no need for this correction
+#you had to turn it into a dataframe first after cleaning it up. Then you can turn the dataframe into a tibble
+
+
+#this will clean up the data
+Mantelstatsexp3<- foreach(i=seq_along(Mantel_localexp3)) %do% {   
+  Mantel_localexp3[[i]]$mantel.res
+}
+
+names(Mantel_localexp3) <- c(1:60)
+
+
+#it had to be renamed again
+#names(Mantelstatsexp1) <- c(1:30)  
+
+###you have to make it into a df first then take out the mantel r column
+dfMantellocal<-as.data.frame(Mantelstatsexp3)
+head(dfMantellocal)
+Mantelstatsexp3<-dfMantellocal %>% 
+  select(cols = contains("Mantel.cor")) %>% melt(cols=c("1":"60"), id.vars=NULL) %>%
+  select(cols = "value") %>% dplyr::rename(Mantel.local = cols)
+
+#pulling out the pvalue in case it is needed 
+Pvalueexp3<-dfMantellocal %>%
+   select(cols = contains("Pr.corrected.")) %>% melt(cols=c("1":"60"), id.vars=NULL) %>%
+  select(cols = "value") %>% dplyr::rename(P.value = cols) 
+
+#pulling out class index column 
+Distanceexp3<-dfMantellocal %>%
+   select(cols = contains("class.index")) %>% reshape2::melt(cols=c("1":"60"), id.vars=NULL) %>%
+  select(cols = "value") %>% dplyr::rename(Class.Index = cols) 
+
+#combining all 3 columns 
+MantelLocalCorrexp3<-cbind(Mantelstatsexp3, Distanceexp3, Pvalueexp3)
+
+```
+
+
+```{r}
+#reading in the parameter table from the Behavior Space Run
+ParameterTableexp3<-read.csv("table_exp3Nurseries1_4_constraints.csv")
+#just making the name smaller. 
+dfMantelLocalexp3<-ParameterTableexp3 
+View(ParameterTableMimicexp3)
+
+#The below is not needed since the files are not corrupt
+#since Param is not a list, it comes in as a csv, you have to delete by -c
+#ParamtibfixedMLocexp2<- dfMantelLocalexp2[-c(418), ]
+#View(ParamtibfixedMLocexp2)
+#the above did not put them in order, so you have to replace the run column 
+#run <- as.data.frame(c(1:479)) %>% select(cols = "c(1:479)") %>% dplyr::rename(run = cols)
+#View(ParamtibfixedMLocexp2)
+#ParamtibfixedMLocexp2$run <- run$run
+#ParamtibfixedMLocexp2
+
+```
+
+```{r}
+#this made replicates of the rows for the runs. So fifteen rows of Run 1, fifteen rows of Run 2 etc... 
+#I did this so I can join the fiften new rows of the CorrColumnsNeeded file to the ParameterTableMimic file. Repeat rows 1 through XXX number of runs, 15 times, for all columns , ] 
+
+Parametersexp3fixed<-dfMantelLocalexp3[rep(seq_len(nrow(dfMantelLocalexp3)), each = 15), ]   
+Parametersexp3fixed
+View(Parametersexp3fixed)
+```
+
+```{r}
+#combine all columns for final 
+MantelLocalFinalexp3<- cbind(MantelLocalCorrexp3, Parametersexp3fixed)  
+write.csv(MantelLocalFinalexp3, "MantelLocalFinalexp3.csv")
+View(MantelLocalFinalexp3)
+
+```
+
+
+```{r}
+## Visualization
+
+library(ggplot2)
+library(gghighlight)
+#you have to graph it like a linear model if you have more than 2 variables. 
+#ggplot needs for this column to be change to as.factor to graph it
+
+#fixing before graphing
+MantelLocalFinalexp3$Nursery = as.factor(MantelLocalFinalexp3$Nursery)
+MantelLocalFinalexp3$P.value = as.character(MantelLocalFinalexp3$P.value)
+MantelLocalFinalexp3<-MantelLocalFinalexp3 %>% dplyr::rename(HT = Happy.type)
+MantelLocalFinalexp3<-MantelLocalFinalexp3 %>% dplyr::rename(Nursery = Num.nursery)
+
+#graph
+ 
+ ggplot(MantelLocalFinalexp3, aes(x = as.numeric(as.character(Class.Index)), y = Mantel.local, color = Nursery)) + 
+  geom_point(alpha = 0.2) + geom_smooth(se = FALSE) + scale_x_continuous(limits = c(0,30), breaks = c(10,20,30)) +
+  geom_hline(yintercept = 0, linetype = 'longdash') + 
+   facet_grid(cols = vars(Constraints)) + 
+  labs(x = "Yard Distance", y = "Mantel R", title = "Local Mantel R Over 30 Yards", subtitle = "Contraints, Nurseries 1&4") + theme_bw()
+
+### this below works but it can be better. you have to create an interaction between the variables you want to highlight. also, you have to create another column for the significant values and mutate that back into original dataframe. 
+
+v1 <- MantelLocalFinalexp3 %>% 
+  mutate(sig = P.value < 0.05) %>% 
+ ggplot(aes(x = as.numeric(as.character(Class.Index)), y = Mantel.local, color = Nursery,
+ group = interaction(sig, Nursery))) + facet_grid(cols = vars(Constraints)) + geom_point(alpha = 0.6) +
+labs(x = "Yard Distance", y = "Mantel R", title = "Local Mantel R Over 30 Yards", subtitle = "Contraints, Nurseries 1& \n P-value < 0.05") + theme_bw() 
+
+v1 + gghighlight(sig == "TRUE") 
+ 
+```
+

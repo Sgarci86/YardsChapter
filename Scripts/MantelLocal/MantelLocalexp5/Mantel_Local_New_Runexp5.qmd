@@ -1,0 +1,110 @@
+
+## Fixing the files for Mantel Local 
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(reshape2)
+library(foreach)
+getwd()
+#Reading in Mantel Correlogram Results from Behavior Space Run
+
+Mantel_localexp5<-readRDS("exp5_mantel_local.rds")
+head(Mantel_localexp5)
+View(Mantel_localexp5)
+
+#Mantel_localexp3[c(418)] <- NULL  no need for this correction
+#you had to turn it into a dataframe first after cleaning it up. Then you can turn the dataframe into a tibble
+
+
+#this will clean up the data
+Mantelstatsexp5<- foreach(i=seq_along(Mantel_localexp5)) %do% {   
+  Mantel_localexp5[[i]]$mantel.res
+}
+
+names(Mantel_localexp5) <- c(1:30)
+
+
+#it had to be renamed again
+#names(Mantelstatsexp1) <- c(1:30)  
+
+###you have to make it into a df first then take out the mantel r column
+dfMantellocal<-as.data.frame(Mantelstatsexp5)
+head(dfMantellocal)
+Mantelstatsexp5<-dfMantellocal %>% 
+  select(cols = contains("Mantel.cor")) %>% melt(cols=c("1":"30"), id.vars=NULL) %>%
+  select(cols = "value") %>% dplyr::rename(Mantel.local = cols)
+
+#pulling out the pvalue in case it is needed 
+Pvalueexp5<-dfMantellocal %>%
+   select(cols = contains("Pr.corrected.")) %>% melt(cols=c("1":"30"), id.vars=NULL) %>%
+  select(cols = "value") %>% dplyr::rename(P.value = cols) 
+
+#pulling out class index column 
+Distanceexp5<-dfMantellocal %>%
+   select(cols = contains("class.index")) %>% reshape2::melt(cols=c("1":"30"), id.vars=NULL) %>%
+  select(cols = "value") %>% dplyr::rename(Class.Index = cols) 
+
+#combining all 3 columns 
+MantelLocalCorrexp5<-cbind(Mantelstatsexp5, Distanceexp5, Pvalueexp5)
+
+```
+
+
+```{r}
+#reading in the parameter table from the Behavior Space Run
+ParameterTableexp5<-read.csv("control_table.csv")
+#just making the name smaller. 
+dfMantelLocalexp5<-ParameterTableexp5 
+View(ParameterTableexp5)
+
+#The below is not needed since the files are not corrupt
+#since Param is not a list, it comes in as a csv, you have to delete by -c
+#ParamtibfixedMLocexp2<- dfMantelLocalexp2[-c(418), ]
+#View(ParamtibfixedMLocexp2)
+#the above did not put them in order, so you have to replace the run column 
+#run <- as.data.frame(c(1:479)) %>% select(cols = "c(1:479)") %>% dplyr::rename(run = cols)
+#View(ParamtibfixedMLocexp2)
+#ParamtibfixedMLocexp2$run <- run$run
+#ParamtibfixedMLocexp2
+
+```
+
+```{r}
+#this made replicates of the rows for the runs. So fifteen rows of Run 1, fifteen rows of Run 2 etc... 
+#I did this so I can join the fiften new rows of the CorrColumnsNeeded file to the ParameterTableMimic file. Repeat rows 1 through XXX number of runs, 15 times, for all columns , ] 
+
+Parametersexp5fixed<-dfMantelLocalexp5[rep(seq_len(nrow(dfMantelLocalexp5)), each = 15), ]   
+Parametersexp5fixed
+View(Parametersexp5fixed)
+```
+
+```{r}
+#combine all columns for final 
+MantelLocalFinalexp5<- cbind(MantelLocalCorrexp5, Parametersexp5fixed)  
+write.csv(MantelLocalFinalexp5, "MantelLocalFinalexp5.csv")
+View(MantelLocalFinalexp5)
+
+```
+
+
+```{r}
+## Visualization
+
+library(ggplot2)
+#you have to graph it like a linear model if you have more than 2 variables. 
+#ggplot needs for this column to be change to as.factor to graph it
+
+#fixing before graphing
+MantelLocalFinalexp5$Nursery = as.factor(MantelLocalFinalexp5$Nursery)
+#MantelLocalFinalexp4<-MantelLocalFinalexp4 %>% dplyr::rename(HT = Happy.type)
+MantelLocalFinalexp5<-MantelLocalFinalexp5 %>% dplyr::rename(Nursery = Num.nursery)
+
+#graph
+ ggplot(MantelLocalFinalexp5, aes(x = as.numeric(as.character(Class.Index)), y = Mantel.local, color = Nursery,
+  shape= Nursery)) + 
+  geom_point(alpha = 0.2) + geom_smooth(se = FALSE) + scale_x_continuous(limits = c(0,30), breaks = c(10,20,30)) +
+  geom_hline(yintercept = 0, linetype = 'longdash') + #+ facet_grid(Neighbor.dist ~ Happy.type, labeller = "label_both") +
+  labs(x = "Yard Distance", y = "Mantel R", title = "Local Mantel R Over 30 Yards", subtitle = "Control") + theme_bw()
+```
+

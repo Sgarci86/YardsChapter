@@ -1,0 +1,130 @@
+
+## Fixing the files for Mantel Local 
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(reshape2)
+library(foreach)
+getwd()
+#Reading in Mantel Correlogram Results from Behavior Space Run
+
+Mantel_localexp2<-readRDS("exp2_mantel_local.rds")
+head(Mantel_localexp2)
+View(Mantel_localexp2)
+
+Mantel_localexp2[c(418)] <- NULL
+#you had to turn it into a dataframe first after cleaning it up. Then you can turn the dataframe into a tibble
+
+
+#this will clean up the data
+Mantelstatsexp2<- foreach(i=seq_along(Mantel_localexp2)) %do% {   
+  Mantel_localexp2[[i]]$mantel.res
+}
+
+names(Mantel_localexp2) <- c(1:479)
+
+
+#it had to be renamed again
+#names(Mantelstatsexp1) <- c(1:30)  
+
+###you have to make it into a df first then take out the mantel r column
+dfMantellocal<-as.data.frame(Mantelstatsexp2)
+head(dfMantellocal)
+Mantelstatsexp2<-dfMantellocal %>% 
+  select(cols = contains("Mantel.cor")) %>% melt(cols=c("1":"479"), id.vars=NULL) %>%
+  select(cols = "value") %>% dplyr::rename(Mantel.local = cols)
+
+#pulling out the pvalue in case it is needed 
+Pvalueexp2<-dfMantellocal %>%
+   select(cols = contains("Pr.corrected.")) %>% melt(cols=c("1":"479"), id.vars=NULL) %>%
+  select(cols = "value") %>% dplyr::rename(P.value = cols) 
+
+#pulling out class index column 
+Distanceexp2<-dfMantellocal %>%
+   select(cols = contains("class.index")) %>% reshape2::melt(cols=c("1":"479"), id.vars=NULL) %>%
+  select(cols = "value") %>% dplyr::rename(Class.Index = cols) 
+
+#combining all 3 columns 
+MantelLocalCorrexp2<-cbind(Mantelstatsexp2, Distanceexp2, Pvalueexp2)
+
+```
+
+
+```{r}
+#reading in the parameter table from the Behavior Space Run
+ParameterTableMimicexp2<-read.csv("table_exp2Nurseries1_4mimic_constraints.csv")
+#just making the name smaller. 
+dfMantelLocalexp2<-ParameterTableMimicexp2 
+#View(ParameterTableMimicexp2)
+
+#since Param is not a list, it comes in as a csv, you have to delete by -c
+ParamtibfixedMLocexp2<- dfMantelLocalexp2[-c(418), ]
+#View(ParamtibfixedMLocexp2)
+#the above did not put them in order, so you have to replace the run column 
+run <- as.data.frame(c(1:479)) %>% select(cols = "c(1:479)") %>% dplyr::rename(run = cols)
+#View(ParamtibfixedMLocexp2)
+ParamtibfixedMLocexp2$run <- run$run
+ParamtibfixedMLocexp2
+
+```
+
+```{r}
+#this made replicates of the rows for the runs. So fifteen rows of Run 1, fifteen rows of Run 2 etc... 
+#I did this so I can join the fiften new rows of the CorrColumnsNeeded file to the ParameterTableMimic file. Repeat rows 1 through XXX number of runs, 15 times, for all columns , ] 
+
+Parametersfixedexp2<-ParamtibfixedMLocexp2[rep(seq_len(nrow(ParamtibfixedMLocexp2)), each = 15), ]   
+Parametersfixedexp2
+#View(Parametersfixedexp2)
+```
+
+```{r}
+#combine all columns for final 
+MantelLocalFinalexp2<- cbind(MantelLocalCorrexp2, Parametersfixedexp2)  
+write.csv(MantelLocalFinalexp2, "MantelLocalFinalexp2.csv")
+#View(MantelLocalFinalexp2)
+
+```
+
+
+```{r}
+## Visualization
+
+library(ggplot2)
+#ggplot needs for this column to be change to as.factor to graph it
+
+MantelLocalFinalexp2<-MantelLocalFinalexp2 %>% dplyr::rename(Nursery = Num.nursery)
+MantelLocalFinalexp2$Nursery = as.factor(MantelLocalFinalexp2$Nursery)
+MantelLocalFinalexp2$Yard.diff = as.factor(MantelLocalFinalexp2$Yard.diff)
+
+#subset the happy.type equal factor 
+attach(MantelLocalFinalexp2) #to begin the subset
+MLequaldata <- MantelLocalFinalexp2[which(Comparison.type == 'equal'),]
+detach(MantelLocalFinalexp2) #to go back to normal?
+
+#subset the happy.type equal-or-greater factor 
+attach(MantelLocalFinalexp2) #to begin the subset
+MLequalorgreaterdata <- MantelLocalFinalexp2[which(Comparison.type == 'equal-or-greater'),]
+detach(MantelLocalFinalexp2) #to go back to normal?
+
+
+View(MLequaldata)
+View(MLequalorgreaterdata)
+View(MantelLocalequalexp2)
+
+ 
+ ggplot(MLequaldata, aes(x = as.numeric(as.character(Class.Index)), y = Mantel.local, color = Nursery, linetype = Yard.diff)) +  
+  geom_point(alpha = 0.2) + geom_smooth(se = FALSE) + scale_x_continuous(limits = c(0,30), breaks = c(10,20,30)) + scale_y_continuous(limits = c(0,0.08), breaks = seq(0,0.08, by=0.02)) + 
+  geom_hline(yintercept = 0, linetype = 'longdash') + facet_grid(Neighbor.distance ~ Constraint, labeller = "label_both") + 
+  labs(x = "Yard Distance", y = "Mantel R", title = "Local Mantel R Over 30 Yards", subtitle = "Comparison type = equal") + theme_bw()
+
+ 
+ ggplot(MLequalorgreaterdata, aes(x = as.numeric(as.character(Class.Index)), y = Mantel.local, color = Nursery, linetype = Yard.diff)) +  
+  geom_point(alpha = 0.2) + geom_smooth(se = FALSE) + scale_x_continuous(limits = c(0,30), breaks = c(10,20,30)) + scale_y_continuous(limits = c(0,0.08), breaks = seq(0,0.08, by=0.02)) +
+  geom_hline(yintercept = 0, linetype = 'longdash') + facet_grid(Neighbor.distance ~ Constraint, labeller = "label_both") +
+  labs(x = "Yard Distance", y = "Mantel R", title = "Local Mantel R Over 30 Yards", subtitle = "Comparison type = equal-or-greater") + theme_bw()
+ 
+ 
+ #guides(linetype = guide_legend(override.res = list(color = "green"))) 
+```
+
